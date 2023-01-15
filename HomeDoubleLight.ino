@@ -19,10 +19,12 @@ VButton btn;
 
 //----------------------------------------------------------
 void setup() {
-  Serial.begin(115200);
-  
   pinMode(LedCOLD_PIN, OUTPUT);
   pinMode(LedWARM_PIN, OUTPUT);
+  digitalWrite(LedCOLD_PIN, 0);
+  digitalWrite(LedWARM_PIN, 0);
+  
+  Serial.begin(115200);
 
   btn.setHoldTimeout(250);
 
@@ -56,7 +58,9 @@ void loop() {
       Serial.print(F(" clickCount = ")); Serial.println(clickCount);
       switch (clickCount) {
         case 1: toggleLeds(); break;
-        case 7: defaultLight(); break;
+        case 2: defaultLight01(); break;
+        case 3: defaultLight50(); break;
+        case 4: defaultLight127(); break;
       }
       clickCount = 0;
       Serial.print(F("reset clickCount = ")); Serial.println(clickCount);
@@ -64,8 +68,27 @@ void loop() {
   }
 }
 
+
 //----------------------------------------------------------
-void defaultLight() {
+void defaultLight127() {
+  Serial.print(F("defaultLight"));
+  powerWarmLed = 127;
+  powerColdLed = 127;
+  onLeds();
+  saveEEPROM();
+}
+
+//----------------------------------------------------------
+void defaultLight01() {
+  Serial.print(F("defaultLight"));
+  powerWarmLed = 1;
+  powerColdLed = 1;
+  onLeds();
+  saveEEPROM();
+}
+
+//----------------------------------------------------------
+void defaultLight50() {
   Serial.print(F("defaultLight"));
   powerWarmLed = 50;
   powerColdLed = 50;
@@ -129,7 +152,7 @@ void incrementLight() {
 //----------------------------------------------------------
 void decrementLight() {
   // Cold- Warm-
-  if (powerColdLed > 10 && powerWarmLed > 10) {
+  if (powerColdLed > 1 && powerWarmLed > 1) {
     Serial.print(F("Cold- Warm-"));
     powerColdLed--;
     powerWarmLed--;
@@ -149,6 +172,9 @@ void toggleLeds() {
 void setPower(uint8_t powerColdLed, uint8_t powerWarmLed) {
   analogWrite(LedCOLD_PIN, ((uint16_t)powerColdLed * powerColdLed + 255) >> 8);
   analogWrite(LedWARM_PIN, ((uint16_t)powerWarmLed * powerWarmLed + 255) >> 8);
+
+//  analogWrite(LedCOLD_PIN, powerColdLed);
+//  analogWrite(LedWARM_PIN, powerWarmLed);
 }
 
 //----------------------------------------------------------
