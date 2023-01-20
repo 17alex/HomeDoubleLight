@@ -3,41 +3,47 @@
 
 #define STR_ADDR 0  // адрес хранения строки в EEPROM
 #define BTN_PIN 2
-#define LedCOLD_PIN 5
+#define LedCOLD_PIN 9 //5
 #define LedWARM_PIN 6
 
 uint8_t powerColdLed = 100;
 uint8_t powerWarmLed = 100;
 uint8_t clickCount = 0;
 uint32_t holdMillis = 0;
+uint32_t ledMillis = 0;
 
 bool needSavePower = false;
 bool isLedsTurnON = false;
 bool isHold = false;
+bool isAutoStart = false;
 
 VButton btn;
 
 //----------------------------------------------------------
 void setup() {
+//  pinMode(LED_BUILTIN, OUTPUT);
   pinMode(LedCOLD_PIN, OUTPUT);
   pinMode(LedWARM_PIN, OUTPUT);
   digitalWrite(LedCOLD_PIN, 0);
   digitalWrite(LedWARM_PIN, 0);
   
-  Serial.begin(115200);
+//  Serial.begin(115200);
 
-  btn.setHoldTimeout(250);
+  btn.setHoldTimeout(350);
 
   loadEEPROM();
+  if (isAutoStart) onLeds();
 }
 
 //----------------------------------------------------------
 void loop() {
+//  if (millis() - ledMillis > 1000) { ledMillis = millis(); digitalWrite(LED_BUILTIN, !digitalRead(LED_BUILTIN)); }
+
   btn.poll(digitalRead(BTN_PIN));
 
   if (btn.click()) {
     clickCount++;
-    Serial.print(F("click: Count = ")); Serial.println(clickCount);
+//    Serial.print(F("click: Count = ")); Serial.println(clickCount);
   }
 
   if (btn.hold()) {
@@ -48,119 +54,120 @@ void loop() {
   }
 
   if (btn.timeout(500)) {
-    Serial.print(F("timeout:"));
+//    Serial.print(F("timeout:"));
     if (isHold) {
       isHold = false;
       clickCount = 0;
-      if (needSavePower) saveEEPROM();
+      if (needSavePower) savePowerToEEPROM();
     }
     else {
-      Serial.print(F(" clickCount = ")); Serial.println(clickCount);
+//      Serial.print(F(" clickCount = ")); Serial.println(clickCount);
       switch (clickCount) {
         case 1: toggleLeds(); break;
-        case 2: defaultLight01(); break;
-        case 3: defaultLight50(); break;
-        case 4: defaultLight127(); break;
+        case 2: setLightPower01(); break;
+        case 3: setLightPower100(); break;
+        case 4: setLightPower200(); break;
+        case 6: toggleAutoStart(); break;
       }
       clickCount = 0;
-      Serial.print(F("reset clickCount = ")); Serial.println(clickCount);
+//      Serial.print(F("reset clickCount = ")); Serial.println(clickCount);
     }
   }
 }
 
-
 //----------------------------------------------------------
-void defaultLight127() {
-  Serial.print(F("defaultLight"));
-  powerWarmLed = 127;
-  powerColdLed = 127;
-  onLeds();
-  saveEEPROM();
+void toggleAutoStart() {
+//  Serial.print(F("toggleAutoStart"));
+  isAutoStart = !isAutoStart;
+  
+  uint8_t count = isAutoStart ? 2 : 1;
+  for (uint8_t i = count; i > 0; i--) {
+    delay(200);
+    setPower(255, 255);
+    delay(100);
+    setPower(0, 0);
+    delay(200);
+  }
+  setPower(powerColdLed, powerWarmLed);
+  
+  saveAutoStartToEEPROM();
 }
 
 //----------------------------------------------------------
-void defaultLight01() {
-  Serial.print(F("defaultLight"));
+void setLightPower200() {
+//  Serial.print(F("defaultLight"));
+  powerWarmLed = 200;
+  powerColdLed = 200;
+  onLeds();
+  savePowerToEEPROM();
+}
+
+//----------------------------------------------------------
+void setLightPower01() {
+//  Serial.print(F("defaultLight"));
   powerWarmLed = 1;
   powerColdLed = 1;
   onLeds();
-  saveEEPROM();
+  savePowerToEEPROM();
 }
 
 //----------------------------------------------------------
-void defaultLight50() {
-  Serial.print(F("defaultLight"));
-  powerWarmLed = 50;
-  powerColdLed = 50;
+void setLightPower100() {
+//  Serial.print(F("defaultLight"));
+  powerWarmLed = 100;
+  powerColdLed = 100;
   onLeds();
-  saveEEPROM();
+  savePowerToEEPROM();
 }
 
 //----------------------------------------------------------
 void holdAction() {
-//  Serial.print(F("holdAction: clickCount = ")); Serial.println(clickCount);
   switch (clickCount) {
     case 1: incrementLight(); break;
     case 2: decrementLight(); break;
-    case 3: coldLight(); break;
-    case 4: warmLight(); break;
+    case 3: incrementColdLight(); break;
+    case 4: incrementWarmLight(); break;
   }
 }
 
 //----------------------------------------------------------
-void warmLight() {
+void incrementWarmLight() {
   // Cold- Warm+
-  if (powerColdLed > 0 && powerWarmLed < 255) {
-    Serial.print(F("Cold- Warm+"));
-    powerColdLed--;
-    powerWarmLed++;
-    Serial.print(F(": powerColdLed = ")); Serial.print(powerColdLed);
-    Serial.print(F(", powerWarmLed = ")); Serial.println(powerWarmLed);
-    setPower(powerColdLed, powerWarmLed);
-    needSavePower = true;
-  }
+  if (powerColdLed > 0) { powerColdLed--; needSavePower = true; }
+  if (powerWarmLed < 255) { powerWarmLed++; needSavePower = true; }
+  setPower(powerColdLed, powerWarmLed);
+//  Serial.print(F("Cold- Warm+: powerColdLed = ")); Serial.print(powerColdLed);
+//  Serial.print(F(", powerWarmLed = ")); Serial.println(powerWarmLed);
 }
 
 //----------------------------------------------------------
-void coldLight() {
+void incrementColdLight() {
   // Cold+ Warm-
-  if (powerColdLed < 255 && powerWarmLed > 0) {
-    Serial.print(F("Cold+ Warm-"));
-    powerColdLed++;
-    powerWarmLed--;
-    Serial.print(F(": powerColdLed = ")); Serial.print(powerColdLed);
-    Serial.print(F(", powerWarmLed = ")); Serial.println(powerWarmLed);
-    setPower(powerColdLed, powerWarmLed);
-    needSavePower = true;
-  }
+  if (powerColdLed < 255) { powerColdLed++; needSavePower = true; }
+  if (powerWarmLed > 0) { powerWarmLed--; needSavePower = true; }
+  setPower(powerColdLed, powerWarmLed);
+//    Serial.print(F("Cold+ Warm-: powerColdLed = ")); Serial.print(powerColdLed);
+//    Serial.print(F(", powerWarmLed = ")); Serial.println(powerWarmLed);
 }
 
 //----------------------------------------------------------
 void incrementLight() {
   // Cold+ Warm+
-  if (powerColdLed < 255 && powerWarmLed < 255) {
-    Serial.print(F("Cold+ Warm+"));
-    powerColdLed++;
-    powerWarmLed++;
-    Serial.print(F(": powerColdLed = ")); Serial.print(powerColdLed);
-    Serial.print(F(", powerWarmLed = ")); Serial.println(powerWarmLed);
-    setPower(powerColdLed, powerWarmLed);
-    needSavePower = true;
-  }
+  if (powerColdLed < 255) { powerColdLed++; needSavePower = true; }
+  if (powerWarmLed < 255) { powerWarmLed++; needSavePower = true; }
+  setPower(powerColdLed, powerWarmLed);
+//    Serial.print(F("Cold+ Warm+: powerColdLed = ")); Serial.print(powerColdLed);
+//    Serial.print(F(", powerWarmLed = ")); Serial.println(powerWarmLed);
 }
 
 //----------------------------------------------------------
 void decrementLight() {
   // Cold- Warm-
-  if (powerColdLed > 1 && powerWarmLed > 1) {
-    Serial.print(F("Cold- Warm-"));
-    powerColdLed--;
-    powerWarmLed--;
-    Serial.print(F(": powerColdLed = ")); Serial.print(powerColdLed);
-    Serial.print(F(", powerWarmLed = ")); Serial.println(powerWarmLed);
-    setPower(powerColdLed, powerWarmLed);
-    needSavePower = true;
-  }
+  if (powerColdLed > 0) { powerColdLed--; needSavePower = true; }
+  if (powerWarmLed > 0) { powerWarmLed--; needSavePower = true; }
+  setPower(powerColdLed, powerWarmLed);
+//    Serial.print(F("Cold- Warm-: powerColdLed = ")); Serial.print(powerColdLed);
+//    Serial.print(F(", powerWarmLed = ")); Serial.println(powerWarmLed);
 }
 
 //----------------------------------------------------------
@@ -178,19 +185,27 @@ void setPower(uint8_t powerColdLed, uint8_t powerWarmLed) {
 }
 
 //----------------------------------------------------------
-void saveEEPROM() {
-  Serial.println(F("saveEEPROM"));
+void savePowerToEEPROM() {
+//  Serial.println(F("savePowerToEEPROM"));
   EEPROM.put(0, powerColdLed);
   EEPROM.put(1, powerWarmLed);
   needSavePower = false;
 }
 
 //----------------------------------------------------------
+void saveAutoStartToEEPROM() {
+//  Serial.println(F("saveAutoStartToEEPROM"));
+  EEPROM.put(2, isAutoStart);
+}
+
+//----------------------------------------------------------
 void loadEEPROM() {
   EEPROM.get(0, powerColdLed);
   EEPROM.get(1, powerWarmLed);
-  Serial.print(F("loadEEPROM: powerColdLed = ")); Serial.print(powerColdLed);
-  Serial.print(F("; powerWarmLed = ")); Serial.println(powerWarmLed);
+  EEPROM.get(2, isAutoStart);
+//  Serial.print(F("loadEEPROM: powerColdLed = ")); Serial.print(powerColdLed);
+//  Serial.print(F("; powerWarmLed = ")); Serial.print(powerWarmLed);
+//  Serial.print(F("; isAutoPower = ")); Serial.println(isAutoPower);
 }
 
 //----------------------------------------------------------
